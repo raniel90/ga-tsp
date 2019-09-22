@@ -10,10 +10,16 @@ from database import Database
 
 CITIES = Database.get_cities()
 
+'''
+  Generate a swapped individual
+'''
 def createRoute(cities):
     route = random.sample(cities, len(cities))
     return route
 
+'''
+  Generate a population with swapped individuals
+'''
 def initialPopulation(popSize, cities):
     population = []
 
@@ -30,17 +36,27 @@ def rankRoutes(population):
 def selection(popRanked, eliteSize):
     selectionResults = []
     df = pd.DataFrame(np.array(popRanked), columns=["Index","Fitness"])
-    df['cum_sum'] = df.Fitness.cumsum()
-    df['cum_perc'] = 100*df.cum_sum/df.Fitness.sum()
-    
+
+    #Cumulative Sum from Fitness column
+    df['cumulative_sum'] = df.Fitness.cumsum()
+
+    #Cumulative Percentage
+    df['cumulative_percentage'] = 100*df.cumulative_sum/df.Fitness.sum()
+
+    #Select elite with tournament operation
     for i in range(0, eliteSize):
         selectionResults.append(popRanked[i][0])
+    
+    #Init Select Items
     for i in range(0, len(popRanked) - eliteSize):
         pick = 100*random.random()
         for i in range(0, len(popRanked)):
-            if pick <= df.iat[i,3]:
+            cumulative_percentage = df.iat[i,3]
+
+            if pick <= cumulative_percentage:
                 selectionResults.append(popRanked[i][0])
                 break
+    
     return selectionResults
 
 def matingPool(population, selectionResults):
@@ -48,8 +64,13 @@ def matingPool(population, selectionResults):
     for i in range(0, len(selectionResults)):
         index = selectionResults[i]
         matingpool.append(population[index])
+
     return matingpool
 
+
+'''
+ Crossover Offspring technique for individual
+'''
 def breed(parent1, parent2):
     child = []
     childP1 = []
@@ -57,7 +78,7 @@ def breed(parent1, parent2):
     
     geneA = int(random.random() * len(parent1))
     geneB = int(random.random() * len(parent1))
-    
+
     startGene = min(geneA, geneB)
     endGene = max(geneA, geneB)
 
@@ -69,6 +90,9 @@ def breed(parent1, parent2):
     child = childP1 + childP2
     return child
 
+'''
+ Apply Crossover Offspring technique for all mating pool
+'''
 def breedPopulation(matingpool, eliteSize):
     children = []
     length = len(matingpool) - eliteSize
