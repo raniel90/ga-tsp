@@ -3,15 +3,17 @@ import operator
 import database
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from city import City
 from fitness import Fitness
 from database import Database
 
+SELECTION_METHOD = 'TOURNAMENT' #ROULETTE or TOURNAMENT
 CITIES = Database.get_cities()
 
 '''
-  Generate a swapped individual
+  Generate a random individual
 '''
 def createRoute(cities):
     route = random.sample(cities, len(cities))
@@ -33,8 +35,8 @@ def rankRoutes(population):
         fitnessResults[i] = Fitness(population[i]).routeFitness()
     return sorted(fitnessResults.items(), key = operator.itemgetter(1), reverse = True)
 
-def selection(popRanked, eliteSize):
-    selectionResults = []
+def selection(popRanked, eliteSize, method):
+    results = []
     df = pd.DataFrame(np.array(popRanked), columns=["Index","Fitness"])
 
     #Cumulative Sum from Fitness column
@@ -43,21 +45,26 @@ def selection(popRanked, eliteSize):
     #Cumulative Percentage
     df['cumulative_percentage'] = 100*df.cumulative_sum/df.Fitness.sum()
 
-    #Select elite with tournament operation
+    #Select elite
     for i in range(0, eliteSize):
-        selectionResults.append(popRanked[i][0])
-    
-    #Init Select Items
-    for i in range(0, len(popRanked) - eliteSize):
-        pick = 100*random.random()
-        for i in range(0, len(popRanked)):
-            cumulative_percentage = df.iat[i,3]
+        results.append(popRanked[i][0])
 
-            if pick <= cumulative_percentage:
-                selectionResults.append(popRanked[i][0])
-                break
+    if (method == 'TOURNAMENT'):
+      for i in range(0, len(popRanked) - eliteSize):
+        in_tournament = random.sample(popRanked, 20)
+        results.append(in_tournament[0][0])
+
+    if (method == 'ROULETTE'):
+      for i in range(0, len(popRanked) - eliteSize):
+          pick = 100*random.random()
+          for i in range(0, len(popRanked)):
+              cumulative_percentage = df.iat[i,3]
+
+              if pick <= cumulative_percentage:
+                  results.append(popRanked[i][0])
+                  break
     
-    return selectionResults
+    return results
 
 def matingPool(population, selectionResults):
     matingpool = []
@@ -113,37 +120,54 @@ def mutate(individual, mutationRate):
             
             city1 = individual[swapped]
             city2 = individual[swapWith]
-            
+
             individual[swapped] = city2
             individual[swapWith] = city1
     return individual
 
 def mutatePopulation(population, mutationRate):
     mutatedPop = []
-    
+
     for ind in range(0, len(population)):
         mutatedInd = mutate(population[ind], mutationRate)
         mutatedPop.append(mutatedInd)
     return mutatedPop
 
-def nextGeneration(currentGen, eliteSize, mutationRate):
+def nextGeneration(currentGen, eliteSize, mutationRate, method):
     popRanked = rankRoutes(currentGen)
-    selectionResults = selection(popRanked, eliteSize)
+    selectionResults = selection(popRanked, eliteSize, method)
     matingpool = matingPool(currentGen, selectionResults)
     children = breedPopulation(matingpool, eliteSize)
     nextGeneration = mutatePopulation(children, mutationRate)
     return nextGeneration
 
-def geneticAlgorithm(population, popSize, eliteSize, mutationRate, generations):
+def run(population, popSize, eliteSize, mutationRate, generations, method, showPlot):
+    all_progress = []
     pop = initialPopulation(popSize, population)
-    print("Initial distance: " + str(1 / rankRoutes(pop)[0][1]))
+    progress = rankRoutes(pop)[0][1]
+    all_progress.append(1 / progress)
+    print("Initial distance: " + str(1 / progress))
     
     for i in range(0, generations):
-        pop = nextGeneration(pop, eliteSize, mutationRate)
-    
-    print("Final distance: " + str(1 / rankRoutes(pop)[0][1]))
-    bestRouteIndex = rankRoutes(pop)[0][0]
-    bestRoute = pop[bestRouteIndex]
-    return bestRoute
+        pop = nextGeneration(pop, eliteSize, mutationRate, method)
+        progress = rankRoutes(pop)[0][1]
+        all_progress.append(1 / progress)
 
-geneticAlgorithm(population=CITIES, popSize=100, eliteSize=20, mutationRate=0.01, generations=500)
+    
+    print("Final distance: " + str(1 / progress))
+
+    if (showPlot):
+      plt.plot(all_progress)
+      plt.ylabel('Distância')
+      plt.xlabel('Geração')
+      plt.show()
+
+run(
+  population=CITIES, 
+  popSize=100, 
+  eliteSize=20, 
+  mutationRate=0.0009,
+  generations=500, 
+  method=SELECTION_METHOD,
+  showPlot=True
+)
